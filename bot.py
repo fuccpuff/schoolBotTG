@@ -1,7 +1,8 @@
 import telebot
 from telebot import types
+from config import BOT_TOKEN
 
-bot = telebot.TeleBot('6613138162:AAHyJ9fpD0FaWw8Cw3PHfk-PN0hwgX9ifT4')
+bot = telebot.TeleBot(BOT_TOKEN)
 
 # Обработчик команды '/start'
 @bot.message_handler(commands=['start'])
