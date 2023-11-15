@@ -1,45 +1,42 @@
 import telebot
 from telebot import types
 from config import BOT_TOKEN
+import database
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
-# Обработчик команды '/start'
 @bot.message_handler(commands=['start'])
 def start(message):
-    # Создаю клавиатуру с кнопками для каждого класса
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
-    class_buttons = [types.KeyboardButton(f'В {i}-м') for i in range(5, 12)]
+    user = database.get_user_by_chat_id(message.chat.id)
+    if user:
+        bot.send_message(message.chat.id, "Ты уже зарегистрирован.")
+    else:
+        bot.send_message(message.chat.id, "Добро пожаловать! Давай зарегистрируем тебя. Как тебя зовут?")
+        bot.register_next_step_handler(message, process_name_step)
+
+def process_name_step(message):
+    chat_id = message.chat.id
+    name = message.text
+    markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
+    class_buttons = [types.KeyboardButton(f'{i}') for i in range(5, 12)]
     markup.add(*class_buttons)
-    # Отправляю сообщение пользователю с вопросом о классе
-    bot.reply_to(message, 'В каком классе ты учишься?', reply_markup=markup)
+    msg = bot.reply_to(message, 'В каком ты классе?', reply_markup=markup)
+    bot.register_next_step_handler(msg, process_class_step, name)
 
-# Обработчик выбора класса
-def on_click(message):
-    class_number = message.text.split()[1][:-2]  # Извлекаю номер класса из сообщения
-    bot.send_message(message.chat.id, f'Ты выбрал {class_number}-й класс')
-    process_class_selection(message, class_number)
-
-# Обработчик выбора буквы класса
-def letter_selected(message):
-    bot.send_message(message.chat.id, f'Ты в классе {message.text}')
-
-# Функция для обработки выбора класса и буквы класса
-def process_class_selection(message, class_number):
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
-    # Создаю кнопки для каждой буквы класса от А до Ж
+def process_class_step(message, name):
+    class_number = message.text
+    markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
     class_letters = ['А', 'Б', 'В', 'Г', 'Д', 'Е', 'Ж']
-    letter_buttons = [types.KeyboardButton(f'В {class_number}{letter} классе') for letter in class_letters]
-    markup.add(*letter_buttons)
-    # Отправляю сообщение пользователю с вопросом о букве класса
-    bot.send_message(message.chat.id, f'Какая у тебя буква в {class_number}-м классе?', reply_markup=markup)
-    # Устанавливаю следующий шаг в обработке сообщений
-    bot.register_next_step_handler(message, letter_selected)
+    for letter in class_letters:
+        markup.add(types.KeyboardButton(letter))
+    msg = bot.reply_to(message, 'Какая буква твоего класса?', reply_markup=markup)
+    bot.register_next_step_handler(msg, process_class_letter_step, name, class_number)
 
-# Регистрирую обработчик сообщений после стартовой команды
-@bot.message_handler(func=lambda message: True)
-def echo_all(message):
-    on_click(message)
+def process_class_letter_step(message, name, class_number):
+    class_letter = message.text
+    chat_id = message.chat.id
+    database.add_user((chat_id, name, class_number, class_letter))
+    bot.send_message(chat_id, f'Ты успешно зарегистрирован: {name}, класс {class_number}{class_letter}')
 
 # Главный цикл для запуска бота
 bot.polling(none_stop=True)
